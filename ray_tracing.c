@@ -174,11 +174,12 @@ void render(Object *obj, int obj_size){
 	double angle = tan(M_PI * 0.5 * (fov / (0.0 + 180)));
 	int i, j, k;
 	for (i = 0; i < width; i++) {
-		*image[i] = malloc(height*sizeof(double*));
+		image[i] = (double **) malloc(height*sizeof(double*));
 		for (j = 0; j < height; j++) {
-		  image[i][j] = malloc(3*sizeof(double));
+		  image[i][j] = (double*) malloc(3*sizeof(double));
 		}
 	}
+	printf("pass\n");
 	//trace rays
 	for (j=0; j<height; j++) {
 		for (i=0; i<width; i++) {
