@@ -215,7 +215,34 @@ void render(Object *obj, int obj_size){
 	free(image);
 }
 
+void createObject(Object *obj,double *position, double radius, double *surface_color,double reflectivity, double transparency,double *emission_color){
+	for(int i=0; i<3; i++){
+		obj->center[i] = position[i];
+		obj->surface_color[i] = surface_color[i];
+		obj->emission_color[i] = emission_color[i];
+	}
+	obj->radius = radius;
+	obj->radius2 = radius*radius;
+	obj->reflection = reflectivity;
+}
+
+
 int main(){
-	
+	Object *objects = malloc(6*sizeof(Object));
+	double emission_color[3] = {0.0, 0.0, 0.0},ligth_ecolor[3] = {3.0 , 3.0, 3.0};
+	double position1[3] = {0.0, -10004, -20}, surfacecolor1[3] = {0.20, 0.20, 0.20};
+	createObject(&objects[0],position1, 10000, surfacecolor1, 0, 0.0, emission_color);
+	double position2[3] = {0.0, 0, -20}, surfacecolor2[3] = {1.00, 0.32, 0.36};
+	createObject(&objects[1],position2, 4, surfacecolor2, 1, 0.5, emission_color);
+	double position3[3] = {5.0, -1, -15}, surfacecolor3[3] = {0.90, 0.76, 0.46};
+	createObject(&objects[2],position3, 2, surfacecolor3, 1, 0.0, emission_color);
+	double position4[3] = {5.0, 0, -25}, surfacecolor4[3] = {0.65, 0.77, 0.97};
+	createObject(&objects[3],position4, 3, surfacecolor4, 1, 0.0, emission_color);
+	double position5[3] = {5.5, 0, -15}, surfacecolor5[3] = {0.90, 0.90, 0.90};
+	createObject(&objects[4],position5, 3, surfacecolor5, 1, 0.0, emission_color);
+	// light
+	double position6[3] = {0.0, 20, -30}, surfacecolor6[3] = {0.00, 0.00, 0.00};
+	createObject(&objects[5],position6, 3, surfacecolor6, 0, 0.0, ligth_ecolor);
+	render(objects, 6);
 	return 0;
 }
