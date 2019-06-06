@@ -28,16 +28,16 @@ void subtractXYZ(double *result, double *p1, double *p2){
 }
 
 double dot(double *v1, double *v2){
-	return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
+	return v1[X] * v2[X] + v1[Y] * v2[Y] + v1[Z] * v2[Z];
 }
 //functions of vec3
 void normalize(double *vec){
 	double nor2 = dot(vec,vec); 
 	if (nor2 > 0) {
 		double inv_nor = 1 / sqrt(nor2);
-		vec[0] *= inv_nor;
-		vec[1] *= inv_nor;
-		vec[2] *= inv_nor;
+		vec[X] *= inv_nor;
+		vec[Y] *= inv_nor;
+		vec[Z] *= inv_nor;
 	}
 }
 
@@ -179,7 +179,6 @@ void render(Object *obj, int obj_size){
 		  image[i][j] = (double*) malloc(3*sizeof(double));
 		}
 	}
-	printf("pass\n");
 	//trace rays
 	for (j=0; j<height; j++) {
 		for (i=0; i<width; i++) {
@@ -189,6 +188,7 @@ void render(Object *obj, int obj_size){
 			raydir[0] = xx; raydir[1] = yy; raydir[2] = -1;
 			normalize(raydir);
 			pixel = trace(rayorig, raydir, 0, obj, obj_size); 
+			//printf("TRACE: %d %d; (%lf %lf %lf)\n",j,i,pixel[0],pixel[1],pixel[2]);
 			for(k=0; k<3; k++)
 				image[i][j][k]=pixel[k];
 		}
@@ -200,9 +200,9 @@ void render(Object *obj, int obj_size){
 	for (j = 0; j < height; j++) {
 		for (i = 0; i < width; i++) {
 			static unsigned char color[3];
-			color[0] = image[i][j][0];
-			color[1] = image[i][j][1];
-			color[2] = image[i][j][2];
+			color[0] = image[i][j][0]*255;
+			color[1] = image[i][j][1]*255;
+			color[2] = image[i][j][2]*255;
 			(void) fwrite(color, 1, 3, fp);
 		}
 	}
@@ -239,7 +239,7 @@ int main(){
 	createObject(&objects[2],position3, 2, surfacecolor3, 1, 0.0, emission_color);
 	double position4[3] = {5.0, 0, -25}, surfacecolor4[3] = {0.65, 0.77, 0.97};
 	createObject(&objects[3],position4, 3, surfacecolor4, 1, 0.0, emission_color);
-	double position5[3] = {5.5, 0, -15}, surfacecolor5[3] = {0.90, 0.90, 0.90};
+	double position5[3] = {-5.5, 0, -15}, surfacecolor5[3] = {0.90, 0.90, 0.90};
 	createObject(&objects[4],position5, 3, surfacecolor5, 1, 0.0, emission_color);
 	// light
 	double position6[3] = {0.0, 20, -30}, surfacecolor6[3] = {0.00, 0.00, 0.00};
