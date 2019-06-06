@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <limits.h>
 #include <math.h>
@@ -165,55 +166,56 @@ double* trace(double *ray_orig, double *ray_dir, int depth, Object *obj,int obj_
 	return color;
 }
 
-
-
-int main(){
-	/*
-	int eyePosition[3] = {0,0,0};
-	int lightPosition[3] = {0,0,0};
-	int light_brightness = 0;
-
-	for(int j=0; j < img_height; j++){
-		for(int i=0; i < img_width; i++){
-			//compute primary ray direction
-			Ray primRay;
-			computePrimRay(i, j, &primRay);
-			Point pHit;
-			Normal nHit;
-			double minDist = INFINITY;
-			Object object = NULL;
-
-			//for each object if we use more than one object
-			for (int k=0; k < n_objetcts; k++) {
-				if (intersect(objects[k],primRay, &pHit, &nHit)) {
-					double distance = Distance(eyePosition, pHit);
-					if (distance < minDist) {
-						object = objects[k];
-						minDist = distance;
-					}
-				}
-			}
-			
-			bool isShadow = false;				
-			if (object != NULL) {
-				//compute illumnination
-				Ray shadowRay;
-				subtractXYZ(&shadowRay.direction,&lightPosition,pHit); //direction = lightPosition - pHit
-				for ( k = 0; k < n_objetcts; k++) {
-					if (intersect(objects[k], shadowRay, &pHit, &nHit)) {
-						isShadow = true;
-						break;
-					}
-				}
-			}
-			if (!isShadow) {
-				pixels[i][j] = object->color * light_brightness;
-			} else {
-				pixels[i][j] = 0;
-			}
+void render(Object *obj, int obj_size){
+	int width = 640, height = 480;
+	double ***image = malloc(width*sizeof(double**));
+	double inv_width = 1 / (0.0+width), inv_height = 1 / (0.0+height);
+	double fov = 30, aspectratio = width / (0.0+height);
+	double angle = tan(M_PI * 0.5 * (fov / (0.0 + 180)));
+	int i, j, k;
+	for (i = 0; i < width; i++) {
+		*image[i] = malloc(height*sizeof(double*));
+		for (j = 0; j < height; j++) {
+		  image[i][j] = malloc(3*sizeof(double));
+		}
+	}
+	//trace rays
+	for (j=0; j<height; j++) {
+		for (i=0; i<width; i++) {
+			double xx = (2 * ((i + 0.5) * inv_width) - 1) * angle * aspectratio;
+			double yy = (1 - 2 * ((j + 0.5) * inv_height)) * angle;
+			double raydir[3], *pixel, rayorig[3] = { 0.0, 0.0, 0.0 };
+			raydir[0] = xx; raydir[1] = yy; raydir[2] = -1;
+			normalize(raydir);
+			pixel = trace(rayorig, raydir, 0, obj, obj_size); 
+			for(k=0; k<3; k++)
+				image[i][j][k]=pixel[k];
 		}
 	}
 
-*/
+	//save result to a PPM image
+	FILE *fp = fopen("first.ppm", "wb"); /* b - binary mode */
+	(void) fprintf(fp, "P6\n%d %d\n255\n", width, height);
+	for (j = 0; j < height; j++) {
+		for (i = 0; i < width; i++) {
+			static unsigned char color[3];
+			color[0] = image[i][j][0];
+			color[1] = image[i][j][1];
+			color[2] = image[i][j][2];
+			(void) fwrite(color, 1, 3, fp);
+		}
+	}
+	(void) fclose(fp);
+	for (i = 0; i < width; i++) {
+		for (j = 0; j < height; j++) {
+		  free(image[i][j]);
+		}
+		free(image[i]);
+	}
+	free(image);
+}
+
+int main(){
+	
 	return 0;
 }
