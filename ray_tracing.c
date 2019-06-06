@@ -20,7 +20,6 @@ typedef struct {
 	double surface_color[3], emission_color[3]; //surface color and emission (light)
 } Object;
 
-
 void subtractXYZ(double *result, double *p1, double *p2){
 	result[0] = p1[0] - p2[0];
 	result[1] = p1[1] - p2[1];
@@ -65,7 +64,7 @@ double mix(double a, double b, double mx){
 If the ray intersects an object, compute the intersection point, the normal at the intersection point, and shade this point using this information. 
 Shading depends on the surface property (is it transparent, reflective, diffuse). The function returns a color for the ray. 
 If the ray intersects an object that is the color of the object at the intersection point, otherwise it returns the background color. */
-double* Trace(double *ray_orig, double *ray_dir, int depth, Object *obj,int obj_size){
+double* trace(double *ray_orig, double *ray_dir, int depth, Object *obj,int obj_size){
 	double tnear = INFINITY;
 	int i;
 	Object *object = NULL;
@@ -115,7 +114,7 @@ double* Trace(double *ray_orig, double *ray_dir, int depth, Object *obj,int obj_
 		for(i=0; i<3; i++)
 			refldir[i]-=nhit[i]*2*dot_raydir_nhit;
 			ray_orig2[i] = phit[i] + nhit[i] * bias;
-		double * reflection = trace(ray_orig2, refldir, obj, depth+1);
+		double * reflection = trace(ray_orig2, refldir, depth+1, obj, obj_size);
 		double * refraction = NULL;
 		// if the sphere is also transparent compute refraction ray
 		if (object->transparency) {
@@ -127,12 +126,12 @@ double* Trace(double *ray_orig, double *ray_dir, int depth, Object *obj,int obj_
 				refrdir[i] = ray_dir[i]*eta + nhit[i] * (eta * cosi - ksqrt);
 				ray_orig2[i] = phit[i] + nhit[i] * bias;
 			normalize(refrdir);
-			refraction = trace(ray_orig2, refldir, obj, depth+1);
+			refraction = trace(ray_orig2, refldir, depth+1, obj, obj_size);
 		} 
 			double refraction_aux[3] = { 0.0, 0.0, 0.0 };
 			if(refraction == NULL) refraction = refraction_aux;
 			for(i=0; i<3; i++)
-				surfacecolor[i] = (reflection[i]*fresneleffect + refraction[i] * (1 - fresneleffect) * object->transparency) * object->surface_color;
+				surfacecolor[i] = (reflection[i]*fresneleffect + refraction[i] * (1 - fresneleffect) * object->transparency) * object->surface_color[i];
 	} else {
 		//diffuse object
 		for (i=0; i < obj_size; i++){
@@ -141,21 +140,22 @@ double* Trace(double *ray_orig, double *ray_dir, int depth, Object *obj,int obj_
 				double transmission[3] = { 1.0, 1.0, 1.0 };
 				double light_direction[3];
 				for(int j=0; j<3; j++)
-					light_direction[j] = obj[i]->center[j] - phit[j];
+					light_direction[j] = obj[i].center[j] - phit[j];
 				normalize(light_direction);
 				for(int j=0; j < obj_size; j++){
 					if( i != j){
 						double t0, t1;
 						for(int k=0; k<3; k++)
 							ray_orig2[k] = phit[k] + nhit[k] * bias;
-						if(insersect(obj[i],light_direction, t0, t1)){
-							trasmission = 0;
+						if(intersect(&obj[i],ray_orig2,light_direction, &t0, &t1)){
+							for(int k=0; k<3; k++)
+								transmission[i] = 0;
 							break;
 						}
 					}
 				}
 				for(int j=0; j<3; j++)
-					surfacecolor[i] += object->surface_color[i] * trasmission[i] * max(0.0,dot(nhit,light_direction)) * object->emission_color[i];
+					surfacecolor[i] += object->surface_color[i] * transmission[i] * max(0.0,dot(nhit,light_direction)) * object->emission_color[i];
 			}
 		}
 		
@@ -164,6 +164,7 @@ double* Trace(double *ray_orig, double *ray_dir, int depth, Object *obj,int obj_
 		color[i] = surfacecolor[i] + object->emission_color[i];
 	return color;
 }
+
 
 
 int main(){
@@ -199,7 +200,7 @@ int main(){
 				Ray shadowRay;
 				subtractXYZ(&shadowRay.direction,&lightPosition,pHit); //direction = lightPosition - pHit
 				for ( k = 0; k < n_objetcts; k++) {
-					if (insersect(objects[k], shadowRay, &pHit, &nHit)) {
+					if (intersect(objects[k], shadowRay, &pHit, &nHit)) {
 						isShadow = true;
 						break;
 					}
