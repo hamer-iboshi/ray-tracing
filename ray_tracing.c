@@ -35,10 +35,10 @@ double dot(double *v1, double *v2){
 void normalize(double *vec){
 	double nor2 = dot(vec,vec); 
 	if (nor2 > 0) {
-		double inv_nor = 1 / sqrt(nor2);
-		vec[X] *= inv_nor;
-		vec[Y] *= inv_nor;
-		vec[Z] *= inv_nor;
+		double inv_nor = 1 / sqrtf(nor2);
+		vec[X] = vec[X] * inv_nor;
+		vec[Y] = vec[Y] * inv_nor;
+		vec[Z] = vec[Z] * inv_nor;
 	}
 }
 
@@ -172,7 +172,7 @@ double* trace(double *ray_orig, double *ray_dir, int depth, Object *obj,int obj_
 }
 
 void render(Object *obj, int obj_size){
-	int width = 640, height = 480;
+	int width = 3840, height = 2160;
 	double ***image = malloc(width*sizeof(double**));
 	double inv_width = 1 / (0.0+width), inv_height = 1 / (0.0+height);
 	double fov = 30, aspectratio = width / (0.0+height);
@@ -186,7 +186,7 @@ void render(Object *obj, int obj_size){
 	}
 	//trace rays
 	double xx , yy;
-	double raydir[3], *pixel, rayorig[3] = { 0, 0, 0 }; //cam origin
+	double raydir[3], *pixel, rayorig[3] = { 0, 5, 20 }; //cam origin
 	for (j=0; j<height; j++) {
 		for (i=0; i<width; i++) {
 			xx = (2 * ((i + 0.5) * inv_width) - 1) * angle * aspectratio;
@@ -257,7 +257,7 @@ int main(){
 	createObject(label5,&objects[4],position5, 3, surfacecolor5, 1, 0.0, emission_color); //black
 	// light
 	char label6[] = "light";
-	double position6[3] = {0.0, 20, -30}, surfacecolor6[3] = {3.00, 3.00, 3.00};
+	double position6[3] = {0.0, 20, -30}, surfacecolor6[3] = {0.00, 0.00, 0.00};
 	createObject(label6,&objects[5],position6, 3, surfacecolor6, 0, 0.0, ligth_ecolor);
 	render(objects, 6);
 	return 0;
