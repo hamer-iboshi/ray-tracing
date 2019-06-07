@@ -4,7 +4,7 @@
 #include <limits.h>
 #include <math.h>
 
-#define MAX_RAY_DEPTH 3
+#define MAX_RAY_DEPTH 10
 #define X 0
 #define Y 1
 #define Z 2
@@ -19,6 +19,7 @@ typedef struct {
 	double radius, radius2; //sphere radius and radius^2
 	double transparency, reflection; //surface transparency and reflectivity
 	double surface_color[3], emission_color[3]; //surface color and emission (light)
+	char *label;
 } Object;
 
 void subtractXYZ(double *result, double *p1, double *p2){
@@ -61,7 +62,7 @@ double mix(double a, double b, double mx){
 	return b * mx + a * (1 - mx);
 } 
 
-/* This is the main trace function. It takes a ray as argument (defined by its origin and direction).Test if this ray intersects any of the geometry in the scene. 
+/* main trace function, takes a ray as argument (defined by its origin and direction).Test if this ray intersects any of the geometry in the scene. 
 If the ray intersects an object, compute the intersection point, the normal at the intersection point, and shade this point using this information. 
 Shading depends on the surface property (is it transparent, reflective, diffuse). The function returns a color for the ray. 
 If the ray intersects an object that is the color of the object at the intersection point, otherwise it returns the background color. */
@@ -109,12 +110,14 @@ double* trace(double *ray_orig, double *ray_dir, int depth, Object *obj,int obj_
 		double facingratio = -dot(ray_dir,nhit);
 		//change the mix value to tweak the effect
 		double fresneleffect = mix(pow(1-facingratio,3),1,0.1);
+		//printf("fresnel :[%lf] [%lf] \n",fresneleffect, facingratio);
 		//compute reflection direction
 		double refldir[3];
 		double dot_raydir_nhit = dot(ray_dir,nhit);
 		for(i=0; i<3; i++)
-			refldir[i]-=nhit[i]*2*dot_raydir_nhit;
+			refldir[i]=ray_dir[i] - nhit[i]*2*dot_raydir_nhit;
 			ray_orig2[i] = phit[i] + nhit[i] * bias;
+		normalize(refldir);
 		double * reflection = trace(ray_orig2, refldir, depth+1, obj, obj_size);
 		double * refraction = NULL;
 		// if the sphere is also transparent compute refraction ray
@@ -129,10 +132,12 @@ double* trace(double *ray_orig, double *ray_dir, int depth, Object *obj,int obj_
 			normalize(refrdir);
 			refraction = trace(ray_orig2, refldir, depth+1, obj, obj_size);
 		} 
-			double refraction_aux[3] = { 0.0, 0.0, 0.0 };
-			if(refraction == NULL) refraction = refraction_aux;
-			for(i=0; i<3; i++)
-				surfacecolor[i] = (reflection[i]*fresneleffect + refraction[i] * (1 - fresneleffect) * object->transparency) * object->surface_color[i];
+		double refraction_aux[3] = { 0.0, 0.0, 0.0 };
+		if(refraction == NULL) refraction = refraction_aux;
+		for(i=0; i<3; i++)
+			surfacecolor[i] = (reflection[i]*fresneleffect + refraction[i] * (1 - fresneleffect) * object->transparency) * object->surface_color[i];
+		//printf("surface :[%lf,%lf,%lf] nhit [%lf,%lf,%lf]\n reflection [ %lf,%lf,%lf ] refraction [ %lf,%lf,%lf ]\n",surfacecolor[0],surfacecolor[1],surfacecolor[2],nhit[0],nhit[1],nhit[2],reflection[0],reflection[1],reflection[2],refraction[0],refraction[1],refraction[2]);
+		//printf("Trace obj: %s surface: [%lf %lf %lf] refraction: [%lf %lf %lf] fresnel: %lf\n",object->label, surfacecolor[0],surfacecolor[1],surfacecolor[2],refraction[0],refraction[1],refraction[2],fresneleffect);
 	} else {
 		//diffuse object
 		for (i=0; i < obj_size; i++){
@@ -180,11 +185,12 @@ void render(Object *obj, int obj_size){
 		}
 	}
 	//trace rays
+	double xx , yy;
+	double raydir[3], *pixel, rayorig[3] = { 0, 0, 0 }; //cam origin
 	for (j=0; j<height; j++) {
 		for (i=0; i<width; i++) {
-			double xx = (2 * ((i + 0.5) * inv_width) - 1) * angle * aspectratio;
-			double yy = (1 - 2 * ((j + 0.5) * inv_height)) * angle;
-			double raydir[3], *pixel, rayorig[3] = { 0.0, 0.0, 0.0 };
+			xx = (2 * ((i + 0.5) * inv_width) - 1) * angle * aspectratio;
+			yy = (1 - 2 * ((j + 0.5) * inv_height)) * angle;
 			raydir[0] = xx; raydir[1] = yy; raydir[2] = -1;
 			normalize(raydir);
 			pixel = trace(rayorig, raydir, 0, obj, obj_size); 
@@ -216,34 +222,43 @@ void render(Object *obj, int obj_size){
 	free(image);
 }
 
-void createObject(Object *obj,double *position, double radius, double *surface_color,double reflectivity, double transparency,double *emission_color){
+void createObject(char *label, Object *obj,double *position, double radius, double *surface_color,double reflectivity, double transparency,double *emission_color){
 	for(int i=0; i<3; i++){
 		obj->center[i] = position[i];
 		obj->surface_color[i] = surface_color[i];
 		obj->emission_color[i] = emission_color[i];
 	}
+	obj->label = label;
 	obj->radius = radius;
 	obj->radius2 = radius*radius;
+	obj->transparency = transparency;
 	obj->reflection = reflectivity;
 }
 
 
 int main(){
 	Object *objects = malloc(6*sizeof(Object));
+	//circle_center, radius, surface_color,reflectivity, transparency, emission_color
 	double emission_color[3] = {0.0, 0.0, 0.0},ligth_ecolor[3] = {3.0 , 3.0, 3.0};
 	double position1[3] = {0.0, -10004, -20}, surfacecolor1[3] = {0.20, 0.20, 0.20};
-	createObject(&objects[0],position1, 10000, surfacecolor1, 0, 0.0, emission_color);
+	char label1[] = "ground";
+	createObject(label1, &objects[0],position1, 10000, surfacecolor1, 0, 0.0, emission_color);
+	char label2[] = "red";
 	double position2[3] = {0.0, 0, -20}, surfacecolor2[3] = {1.00, 0.32, 0.36};
-	createObject(&objects[1],position2, 4, surfacecolor2, 1, 0.5, emission_color);
+	createObject(label2, &objects[1],position2, 4, surfacecolor2, 1, 0.5, emission_color); //red
+	char label3[] = "yellow";
 	double position3[3] = {5.0, -1, -15}, surfacecolor3[3] = {0.90, 0.76, 0.46};
-	createObject(&objects[2],position3, 2, surfacecolor3, 1, 0.0, emission_color);
+	createObject(label3, &objects[2],position3, 2, surfacecolor3, 1, 0.0, emission_color); //yellow
+	char label4[] = "blue";
 	double position4[3] = {5.0, 0, -25}, surfacecolor4[3] = {0.65, 0.77, 0.97};
-	createObject(&objects[3],position4, 3, surfacecolor4, 1, 0.0, emission_color);
+	createObject(label4,&objects[3],position4, 3, surfacecolor4, 1, 0.0, emission_color); //blue 
+	char label5[] = "black";
 	double position5[3] = {-5.5, 0, -15}, surfacecolor5[3] = {0.90, 0.90, 0.90};
-	createObject(&objects[4],position5, 3, surfacecolor5, 1, 0.0, emission_color);
+	createObject(label5,&objects[4],position5, 3, surfacecolor5, 1, 0.0, emission_color); //black
 	// light
-	double position6[3] = {0.0, 20, -30}, surfacecolor6[3] = {0.00, 0.00, 0.00};
-	createObject(&objects[5],position6, 3, surfacecolor6, 0, 0.0, ligth_ecolor);
+	char label6[] = "light";
+	double position6[3] = {0.0, 20, -30}, surfacecolor6[3] = {3.00, 3.00, 3.00};
+	createObject(label6,&objects[5],position6, 3, surfacecolor6, 0, 0.0, ligth_ecolor);
 	render(objects, 6);
 	return 0;
 }
