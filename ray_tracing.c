@@ -4,7 +4,7 @@
 #include <limits.h>
 #include <math.h>
 
-#define MAX_RAY_DEPTH 10
+#define MAX_RAY_DEPTH 5
 #define X 0
 #define Y 1
 #define Z 2
@@ -33,7 +33,7 @@ double dot(double *v1, double *v2){
 }
 //functions of vec3
 void normalize(double *vec){
-	double nor2 = dot(vec,vec); 
+	double nor2 = dot(vec,vec);
 	if (nor2 > 0) {
 		double inv_nor = 1 / sqrtf(nor2);
 		vec[X] = vec[X] * inv_nor;
@@ -48,8 +48,10 @@ bool intersect(Object *obj, double *rayorig, double *raydir, double *t0, double 
 	double l[3], tca, d2, thc;
 	subtractXYZ(l,obj->center,rayorig);
 	tca = dot(l,raydir); //l.dot(raydir)
+	// printf("\tTCA %lf center [%lf %lf %lf] ray_orig [%lf %lf %lf] raydir [%lf %lf %lf]\n",tca,obj->center[0],obj->center[1],obj->center[2],rayorig[0],rayorig[1],rayorig[2],raydir[0],raydir[1],raydir[2]);
 	if (tca < 0) return false;
 	d2 = dot(l,l)- (tca * tca) ; //l.dot(l)
+	// printf("D2 %lf\n",d2);
 	if(d2 > obj->radius2) return false;
 	thc = sqrt(obj->radius2 - d2);
 	*t0 = tca - thc;
@@ -60,18 +62,19 @@ bool intersect(Object *obj, double *rayorig, double *raydir, double *t0, double 
 
 double mix(double a, double b, double mx){
 	return b * mx + a * (1 - mx);
-} 
+}
 
-/* main trace function, takes a ray as argument (defined by its origin and direction).Test if this ray intersects any of the geometry in the scene. 
-If the ray intersects an object, compute the intersection point, the normal at the intersection point, and shade this point using this information. 
-Shading depends on the surface property (is it transparent, reflective, diffuse). The function returns a color for the ray. 
+/* main trace function, takes a ray as argument (defined by its origin and direction).Test if this ray intersects any of the geometry in the scene.
+If the ray intersects an object, compute the intersection point, the normal at the intersection point, and shade this point using this information.
+Shading depends on the surface property (is it transparent, reflective, diffuse). The function returns a color for the ray.
 If the ray intersects an object that is the color of the object at the intersection point, otherwise it returns the background color. */
-double* trace(double *ray_orig, double *ray_dir, int depth, Object *obj,int obj_size){
+double* trace(double ray_orig[3], double ray_dir[3], int depth, Object *obj,int obj_size){
 	double tnear = INFINITY;
 	int i;
 	Object *object = NULL;
 	static double color[3];
 	// find intersection of this ray with the sphere in the scene
+	printf("Deph : %d\n",depth);
 	for (i=0; i < obj_size; i++) {
 		double t0 = INFINITY, t1 = INFINITY;
 		if (intersect(&obj[i],ray_orig,ray_dir,&t0,&t1)) {
@@ -80,43 +83,53 @@ double* trace(double *ray_orig, double *ray_dir, int depth, Object *obj,int obj_
 				tnear = t0;
 				object = &obj[i];
 			}
-		}		
+		}
+		printf("RADIUS [%d]: [%lf %lf %lf] [%lf %lf %lf]\n",i,ray_orig[0],ray_orig[1],ray_orig[2],ray_dir[0],ray_dir[1],ray_dir[2]);
+		printf("Obj [%s] t0 %lf tnear  %lf\n",obj[i].label,t0,tnear);
 	}
 
 	// if there's no intersection return black or background color
 	if (!object) {
 		for (i=0; i<3; i++)
 			color[i] = 2;
+		printf("out\n");
 			return color;
 	}
 	double surfacecolor[3] = { 0.0, 0.0, 0.0 };
 	double phit[3], nhit[3];
 	for (i=0; i<3; i++)
 		phit[i] = ray_orig[i] + ray_dir[i] * tnear;
-	for (i=0; i<3; i++)
-		nhit[i] = phit[i] - object->center[i];
+	subtractXYZ(nhit,phit,object->center);
 	normalize(nhit); //normalize normal direction
-	// If the normal and the view direction are not opposite to each other reverse the normal direction. 
+	// If the normal and the view direction are not opposite to each other reverse the normal direction.
 	//That also means we are inside the sphere so set the inside bool to true. Finally reverse the sign of IdotN which we want positive.
 	double bias = 1e-4; //add some vias to the poin to be traced
 	bool inside = false;
+	printf("\tIN %lf ",dot(ray_dir,nhit));
+	printf("nhit [%lf %lf %lf] raydir [%lf %lf %lf] \n",nhit[0],nhit[1],nhit[2],ray_dir[0],ray_dir[1],ray_dir[2]);
 	if (dot(ray_dir,nhit) > 0) {
-		for (i=0; i<3; i++)
+		printf("INSIDE ");
+		for (i=0; i<3; i++){
 			nhit[i] = -nhit[i];
+			printf("%lf ",nhit[i]);
+		}
+		printf("\n");
 		inside = true;
 	}
 	double ray_orig2[3];
+	double refldir[3];
+
 	if ((object->transparency > 0 || object->reflection > 0) && depth < MAX_RAY_DEPTH) {
 		double facingratio = -dot(ray_dir,nhit);
 		//change the mix value to tweak the effect
 		double fresneleffect = mix(pow(1-facingratio,3),1,0.1);
 		//printf("fresnel :[%lf] [%lf] \n",fresneleffect, facingratio);
 		//compute reflection direction
-		double refldir[3];
 		double dot_raydir_nhit = dot(ray_dir,nhit);
-		for(i=0; i<3; i++)
+		for(i=0; i<3; i++){
 			refldir[i]=ray_dir[i] - nhit[i]*2*dot_raydir_nhit;
 			ray_orig2[i] = phit[i] + nhit[i] * bias;
+		}
 		normalize(refldir);
 		double * reflection = trace(ray_orig2, refldir, depth+1, obj, obj_size);
 		double * refraction = NULL;
@@ -125,13 +138,16 @@ double* trace(double *ray_orig, double *ray_dir, int depth, Object *obj,int obj_
 			double ior = 1.1, eta = (inside) ? ior : 1/ior; //inside the surface?
 			double cosi = -dot(nhit,ray_dir);
 			double k = 1 - eta*eta*(1 - cosi*cosi);
-			double refrdir[3], ksqrt = sqrt(k);
-			for(i=0; i<3; i++)
-				refrdir[i] = ray_dir[i]*eta + nhit[i] * (eta * cosi - ksqrt);
+			double ksqrt = sqrt(k);
+			for(i=0; i<3; i++){
+				refldir[i] = ray_dir[i]*eta + nhit[i] * (eta * cosi - ksqrt);
 				ray_orig2[i] = phit[i] + nhit[i] * bias;
-			normalize(refrdir);
+			}
+			normalize(refldir);
+			printf("refdir [%lf %lf %lf]\n",refldir[0],refldir[1],refldir[2]);
+			printf("origin [%lf %lf %lf]\n",ray_orig2[0],ray_orig2[1],ray_orig2[2]);
 			refraction = trace(ray_orig2, refldir, depth+1, obj, obj_size);
-		} 
+		}
 		double refraction_aux[3] = { 0.0, 0.0, 0.0 };
 		if(refraction == NULL) refraction = refraction_aux;
 		for(i=0; i<3; i++)
@@ -161,10 +177,10 @@ double* trace(double *ray_orig, double *ray_dir, int depth, Object *obj,int obj_
 					}
 				}
 				for(int j=0; j<3; j++)
-					surfacecolor[i] += object->surface_color[i] * transmission[i] * max(0.0,dot(nhit,light_direction)) * object->emission_color[i];
+					surfacecolor[i] += object->surface_color[i] * transmission[i] *( max(0.0,dot(nhit,light_direction))) * object->emission_color[i];
 			}
 		}
-		
+
 	}
 	for(i=0; i<3; i++)
 		color[i] = surfacecolor[i] + object->emission_color[i];
@@ -172,7 +188,7 @@ double* trace(double *ray_orig, double *ray_dir, int depth, Object *obj,int obj_
 }
 
 void render(Object *obj, int obj_size){
-	int width = 3840, height = 2160;
+	int width = 640, height = 480;
 	double ***image = malloc(width*sizeof(double**));
 	double inv_width = 1 / (0.0+width), inv_height = 1 / (0.0+height);
 	double fov = 30, aspectratio = width / (0.0+height);
@@ -186,14 +202,15 @@ void render(Object *obj, int obj_size){
 	}
 	//trace rays
 	double xx , yy;
-	double raydir[3], *pixel, rayorig[3] = { 0, 5, 20 }; //cam origin
+	double raydir[3], *pixel, rayorig[3] = { 0, 0, 0 }; //cam origin
 	for (j=0; j<height; j++) {
 		for (i=0; i<width; i++) {
 			xx = (2 * ((i + 0.5) * inv_width) - 1) * angle * aspectratio;
 			yy = (1 - 2 * ((j + 0.5) * inv_height)) * angle;
 			raydir[0] = xx; raydir[1] = yy; raydir[2] = -1;
 			normalize(raydir);
-			pixel = trace(rayorig, raydir, 0, obj, obj_size); 
+			printf("POSITION [%d, %d]\n",i,j);
+			pixel = trace(rayorig, raydir, 0, obj, obj_size);
 			//printf("TRACE: %d %d; (%lf %lf %lf)\n",j,i,pixel[0],pixel[1],pixel[2]);
 			for(k=0; k<3; k++)
 				image[i][j][k]=pixel[k];
@@ -239,7 +256,7 @@ void createObject(char *label, Object *obj,double *position, double radius, doub
 int main(){
 	Object *objects = malloc(6*sizeof(Object));
 	//circle_center, radius, surface_color,reflectivity, transparency, emission_color
-	double emission_color[3] = {0.0, 0.0, 0.0},ligth_ecolor[3] = {3.0 , 3.0, 3.0};
+	double emission_color[3] = {0.0, 0.0, 0.0},ligth_ecolor[3] = {1.0 , 1.0, 1.0};
 	double position1[3] = {0.0, -10004, -20}, surfacecolor1[3] = {0.20, 0.20, 0.20};
 	char label1[] = "ground";
 	createObject(label1, &objects[0],position1, 10000, surfacecolor1, 0, 0.0, emission_color);
@@ -251,7 +268,7 @@ int main(){
 	createObject(label3, &objects[2],position3, 2, surfacecolor3, 1, 0.0, emission_color); //yellow
 	char label4[] = "blue";
 	double position4[3] = {5.0, 0, -25}, surfacecolor4[3] = {0.65, 0.77, 0.97};
-	createObject(label4,&objects[3],position4, 3, surfacecolor4, 1, 0.0, emission_color); //blue 
+	createObject(label4,&objects[3],position4, 3, surfacecolor4, 1, 0.0, emission_color); //blue
 	char label5[] = "black";
 	double position5[3] = {-5.5, 0, -15}, surfacecolor5[3] = {0.90, 0.90, 0.90};
 	createObject(label5,&objects[4],position5, 3, surfacecolor5, 1, 0.0, emission_color); //black
