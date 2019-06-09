@@ -96,13 +96,16 @@ public:
     {
         Vec3f l = center - rayorig;
         float tca = l.dot(raydir);
+        // std::cout << "\tTCA " << tca << " CENTER "<< center << " ray_orig " << rayorig << " raydir "<< raydir << std::endl;
         if (tca < 0) return false;
         float d2 = l.dot(l) - tca * tca;
+        // std::cout << "D2 " << d2 << std::endl;
         if (d2 > radius2) return false;
         float thc = sqrt(radius2 - d2);
         t0 = tca - thc;
         t1 = tca + thc;
-        
+        // std::cout << "THC " << tca + thc  << " " << tca - thc << " " << thc << " " << tca << std::endl;
+
         return true;
     }
 };
@@ -137,6 +140,7 @@ Vec3f trace(
     float tnear = INFINITY;
     const Sphere* sphere = NULL;
     // find intersection of this ray with the sphere in the scene
+	// std::cout << "Deph : " << depth << std::endl;
     for (unsigned i = 0; i < spheres.size(); ++i) {
         float t0 = INFINITY, t1 = INFINITY;
         if (spheres[i].intersect(rayorig, raydir, t0, t1)) {
@@ -146,9 +150,14 @@ Vec3f trace(
                 sphere = &spheres[i];
             }
         }
+		// std::cout << "RADIUS["<<i<<": " << rayorig << " " << raydir << std::endl;
+		// std::cout << "Obj t0 " << t0 << " "<<  tnear << std::endl;
     }
     // if there's no intersection return black or background color
-    if (!sphere) return Vec3f(2);
+    if (!sphere){
+		// std::cout << "OUT" << std::endl;
+		return Vec3f(2);
+	}
     Vec3f surfaceColor = 0; // color of the ray/surfaceof the object intersected by the ray
     Vec3f phit = rayorig + raydir * tnear; // point of intersection
     Vec3f nhit = phit - sphere->center; // normal at the intersection point
@@ -159,13 +168,17 @@ Vec3f trace(
     // positive.
     float bias = 1e-4; // add some bias to the point from which we will be tracing
     bool inside = false;
-    if (raydir.dot(nhit) > 0) nhit = -nhit, inside = true;
+    // std::cout << "IN " << raydir.dot(nhit) << " near "<< tnear << rayorig << raydir << std::endl;
+    if (raydir.dot(nhit) > 0){
+		 nhit = -nhit, inside = true;
+		// std::cout << "INSIDE "<< nhit << std::endl;
+	}
     if ((sphere->transparency > 0 || sphere->reflection > 0) && depth < MAX_RAY_DEPTH) {
         float facingratio = -raydir.dot(nhit);
         // change the mix value to tweak the effect
         float fresneleffect = mix(pow(1 - facingratio, 3), 1, 0.1);
 		//std::cout << "nhit " << nhit << std::endl;
-		//std::cout << "fresnel " << fresneleffect << " " << facingratio <<std::endl;
+		std::cout << "fresnel " << fresneleffect << " " << facingratio <<std::endl;
         // compute reflection direction (not need to normalize because all vectors
         // are already normalized)
         Vec3f refldir = raydir - nhit * 2 * raydir.dot(nhit);
@@ -173,24 +186,27 @@ Vec3f trace(
         Vec3f reflection = trace(phit + nhit * bias, refldir, spheres, depth + 1);
         Vec3f refraction = 0;
         // if the sphere is also transparent compute refraction ray (transmission)
-        if (sphere->transparency) {
-            float ior = 1.1, eta = (inside) ? ior : 1 / ior; // are we inside or outside the surface?
-            float cosi = -nhit.dot(raydir);
-            float k = 1 - eta * eta * (1 - cosi * cosi);
-            Vec3f refrdir = raydir * eta + nhit * (eta *  cosi - sqrt(k));
-            refrdir.normalize();
-            refraction = trace(phit - nhit * bias, refrdir, spheres, depth + 1);
-        }
+        // if (sphere->transparency) {
+        //     float ior = 1.1, eta = (inside) ? ior : 1 / ior; // are we inside or outside the surface?
+        //     float cosi = -nhit.dot(raydir);
+        //     float k = 1 - eta * eta * (1 - cosi * cosi);
+        //     Vec3f refrdir = raydir * eta + nhit * (eta *  cosi - sqrt(k));
+        //     refrdir.normalize();
+		// 	std::cout << "refdir " << refrdir << std::endl;
+		// 	std::cout << "origin " << phit - nhit * bias << std::endl;
+        //     refraction = trace(phit - nhit * bias, refrdir, spheres, depth + 1);
+        // }
         // the result is a mix of reflection and refraction (if the sphere is transparent)
         surfaceColor = (
             reflection * fresneleffect +
             refraction * (1 - fresneleffect) * sphere->transparency) * sphere->surfaceColor;
-		std::cout << "suurface " << surfaceColor << " " << nhit << " " << reflection << " " << refraction <<std::endl;
+		//std::cout << "suurface " << surfaceColor << " " << nhit << " " << reflection << " " << refraction <<std::endl;
 		// std::cout << "Trace obj: refl: " << reflection << " refraction: " << refraction << " fresnel: "<< fresneleffect << std::endl;
     }
     else {
         // it's a diffuse object, no need to raytrace any further
         for (unsigned i = 0; i < spheres.size(); ++i) {
+            // std::cout << "\tLUZ" << spheres[i].emissionColor.x /<< std::endl;
             if (spheres[i].emissionColor.x > 0) {
                 // this is a light
                 Vec3f transmission = 1;
@@ -207,10 +223,11 @@ Vec3f trace(
                 }
                 surfaceColor += sphere->surfaceColor * transmission *
                 std::max(float(0), nhit.dot(lightDirection)) * spheres[i].emissionColor;
+                // std::cout << "\tLIGHT " << surfaceColor << " trans "<< transmission << std::endl;
             }
         }
     }
-    
+
     return surfaceColor + sphere->emissionColor;
 }
 
@@ -234,7 +251,9 @@ void render(const std::vector<Sphere> &spheres)
             float yy = (1 - 2 * ((y + 0.5) * invHeight)) * angle;
             Vec3f raydir(xx, yy, -1);
             raydir.normalize();
+			std::cout << "POSITION [" << x << ", " << y << "]" << std::endl;
             *pixel = trace(Vec3f(0), raydir, spheres, 0);
+            // if(x > 311 && y > 57) exit(0);
         }
     }
     // Save result to a PPM image (keep these flags if you compile under Windows)
@@ -267,6 +286,6 @@ int main(int argc, char **argv)
     // light
     spheres.push_back(Sphere(Vec3f( 0.0,     20, -30),     3, Vec3f(0.00, 0.00, 0.00), 0, 0.0, Vec3f(3)));
     render(spheres);
-    
+
     return 0;
 }
