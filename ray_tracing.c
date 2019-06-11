@@ -48,15 +48,12 @@ bool intersect(Object *obj, float *rayorig, float *raydir, float *t0, float *t1)
 	float l[3], tca, d2, thc;
 	subtractXYZ(l,obj->center,rayorig); //center - rayorig
 	tca = dot(l,raydir); //l.dot(raydir)
-	// printf("\tTCA %f center [%f %f %f] ray_orig [%f %f %f] raydir [%f %f %f]\n",tca,obj->center[0],obj->center[1],obj->center[2],rayorig[0],rayorig[1],rayorig[2],raydir[0],raydir[1],raydir[2]);
 	if (tca < 0) return false;
 	d2 = dot(l,l)- (tca * tca) ; //l.dot(l)
-	// printf("D2 %f\n",d2);
 	if(d2 > obj->radius2) return false;
 	thc = sqrt(obj->radius2 - d2);
 	*t0 = tca - thc;
 	*t1 = tca + thc;
-	// printf("THC %f %f %f %f\n",tca + thc,tca - thc,tca,thc);
 	return true;
 }
 
@@ -75,7 +72,6 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 	Object *object = NULL;
 	static float color[3];
 	// find intersection of this ray with the sphere in the scene
-	// printf("Deph : %d\n",depth);
 	for (i=0; i < obj_size; i++) {
 		float t0 = INFINITY, t1 = INFINITY;
 		if (intersect(&obj[i],ray_orig,ray_dir,&t0,&t1)) {
@@ -85,8 +81,6 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 				object = &obj[i];
 			}
 		}
-		// printf("RADIUS [%d]: [%f %f %f] [%f %f %f]\n",i,ray_orig[0],ray_orig[1],ray_orig[2],ray_dir[0],ray_dir[1],ray_dir[2]);
-		// printf("Obj t0 %f tnear  %f\n",t0,tnear);
 	}
 
 	// if there's no intersection return black or background color
@@ -106,15 +100,10 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 	//That also means we are inside the sphere so set the inside bool to true. Finally reverse the sign of IdotN which we want positive.
 	float bias = 1e-4; //add some vias to the poin to be traced
 	bool inside = false;
-	// printf("\tIN %f near %f",dot(ray_dir,nhit),tnear);
-	// printf("nhit [%f %f %f] raydir [%f %f %f] \n",ray_orig[0],ray_orig[1],ray_orig[2],ray_dir[0],ray_dir[1],ray_dir[2]);
 	if (dot(ray_dir,nhit) > 0) {
-		// printf("INSIDE ");
 		for (i=0; i<3; i++){
 			nhit[i] = -nhit[i];
-			// printf("%f ",nhit[i]);
 		}
-		// printf("\n");
 		inside = true;
 	}
 	float ray_orig2[3];
@@ -124,7 +113,6 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 		float facingratio = -dot(ray_dir,nhit);
 		// change the mix value to tweak the effect
 		float fresneleffect = mix(pow(1-facingratio,4),1,0.1);
-		// printf("fresnel :[%f] [%f] \n",fresneleffect, facingratio);
 		//compute reflection direction
 		float dot_raydir_nhit = dot(ray_dir,nhit);
 		for(i=0; i<3; i++){
@@ -153,12 +141,9 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 		if(refraction == NULL) refraction = refraction_aux;
 		for(i=0; i<3; i++)
 			surfacecolor[i] = (reflection[i]*fresneleffect + refraction[i] * (1 - fresneleffect) * object->transparency) * object->surface_color[i];
-		//printf("surface :[%f,%f,%f] nhit [%f,%f,%f]\n reflection [ %f,%f,%f ] refraction [ %f,%f,%f ]\n",surfacecolor[0],surfacecolor[1],surfacecolor[2],nhit[0],nhit[1],nhit[2],reflection[0],reflection[1],reflection[2],refraction[0],refraction[1],refraction[2]);
-		//printf("Trace obj: %s surface: [%f %f %f] refraction: [%f %f %f] fresnel: %f\n",object->label, surfacecolor[0],surfacecolor[1],surfacecolor[2],refraction[0],refraction[1],refraction[2],fresneleffect);
 	} else {
 		//diffuse object
 		for (i=0; i < obj_size; i++){
-			// printf("\tLUZ %lf\n",obj[i].emission_color[X]);
 			if (obj[i].emission_color[X] > 0) {
 
 				//light
@@ -182,7 +167,6 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 				for(int j=0; j<3; j++){
 					surfacecolor[j] += object->surface_color[j] * transmission[j] *( dot(nhit,light_direction)) * obj[i].emission_color[j];
 				}
-				// printf("LIGHT [%f %f %f] [%f %f %f]\n",surfacecolor[0],surfacecolor[1],surfacecolor[2],transmission[0],transmission[1],transmission[2]);
 			}
 		}
 
@@ -215,12 +199,9 @@ void render(Object *obj, int obj_size){
 			yy = (1 - 2 * ((j + 0.5) * inv_height)) * angle;
 			raydir[0] = xx; raydir[1] = yy; raydir[2] = -1;
 			normalize(raydir);
-			// printf("POSITION [%d, %d]\n",i,j);
 			pixel = trace(rayorig, raydir, 0, obj, obj_size);
-			//printf("TRACE: %d %d; (%f %f %f)\n",j,i,pixel[0],pixel[1],pixel[2]);
 			for(k=0; k<3; k++)
 				image[i][j][k]=pixel[k];
-			// if(i > 311 && j > 57) exit(0);
 		}
 	}
 
