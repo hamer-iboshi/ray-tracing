@@ -4,7 +4,7 @@
 #include <limits.h>
 #include <math.h>
 
-#define MAX_RAY_DEPTH 5
+#define MAX_RAY_DEPTH 10
 #define X 0
 #define Y 1
 #define Z 2
@@ -179,8 +179,8 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 }
 
 void render(Object *obj, int obj_size){
-	//int width = 3840, height = 2160;
-	int width = 640, height = 480;
+	int width = 3840, height = 2160;
+	//int width = 640, height = 480;
 	float ***image = malloc(width*sizeof(float**));
 	float inv_width = 1 / (0.0+width), inv_height = 1 / (0.0+height);
 	float fov = 30, aspectratio = width / (0.0+height);
