@@ -47,15 +47,12 @@ bool intersect(Object *obj, float *rayorig, float *raydir, float *t0, float *t1)
 	float l[3], tca, d2, thc;
 	subtractXYZ(l,obj->center,rayorig); //center - rayorig
 	tca = dot(l,raydir); //l.dot(raydir)
-	// printf("\tTCA %f center [%f %f %f] ray_orig [%f %f %f] raydir [%f %f %f]\n",tca,obj->center[0],obj->center[1],obj->center[2],rayorig[0],rayorig[1],rayorig[2],raydir[0],raydir[1],raydir[2]);
 	if (tca < 0) return false;
 	d2 = dot(l,l)- (tca * tca) ; //l.dot(l)
-	// printf("D2 %f\n",d2);
 	if(d2 > obj->radius2) return false;
 	thc = sqrt(obj->radius2 - d2);
 	*t0 = tca - thc;
 	*t1 = tca + thc;
-	// printf("THC %f %f %f %f\n",tca + thc,tca - thc,tca,thc);
 	return true;
 }
 
