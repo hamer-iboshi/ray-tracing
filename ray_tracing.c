@@ -42,7 +42,6 @@ void normalize(float *vec){
 	}
 }
 
-
 //functions of Sphere
 bool intersect(Object *obj, float *rayorig, float *raydir, float *t0, float *t1){
 	float l[3], tca, d2, thc;
@@ -60,7 +59,6 @@ bool intersect(Object *obj, float *rayorig, float *raydir, float *t0, float *t1)
 	return true;
 }
 
-
 float mix(float a, float b, float mx){
 	return b * mx + a * (1 - mx);
 }
@@ -75,7 +73,6 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 	Object *object = NULL;
 	static float color[3];
 	// find intersection of this ray with the sphere in the scene
-	// printf("Deph : %d\n",depth);
 	for (i=0; i < obj_size; i++) {
 		float t0 = INFINITY, t1 = INFINITY;
 		if (intersect(&obj[i],ray_orig,ray_dir,&t0,&t1)) {
@@ -85,15 +82,12 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 				object = &obj[i];
 			}
 		}
-		// printf("RADIUS [%d]: [%f %f %f] [%f %f %f]\n",i,ray_orig[0],ray_orig[1],ray_orig[2],ray_dir[0],ray_dir[1],ray_dir[2]);
-		// printf("Obj t0 %f tnear  %f\n",t0,tnear);
 	}
 
 	// if there's no intersection return black or background color
 	if (!object) {
 		for (i=0; i<3; i++)
 			color[i] = 2;
-		// printf("out\n");
 			return color;
 	}
 	float surfacecolor[3] = { 0.0, 0.0, 0.0 };
@@ -106,15 +100,10 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 	//That also means we are inside the sphere so set the inside bool to true. Finally reverse the sign of IdotN which we want positive.
 	float bias = 1e-4; //add some vias to the poin to be traced
 	bool inside = false;
-	// printf("\tIN %f near %f",dot(ray_dir,nhit),tnear);
-	// printf("nhit [%f %f %f] raydir [%f %f %f] \n",ray_orig[0],ray_orig[1],ray_orig[2],ray_dir[0],ray_dir[1],ray_dir[2]);
 	if (dot(ray_dir,nhit) > 0) {
-		// printf("INSIDE ");
 		for (i=0; i<3; i++){
 			nhit[i] = -nhit[i];
-			// printf("%f ",nhit[i]);
 		}
-		// printf("\n");
 		inside = true;
 	}
 	float ray_orig2[3];
@@ -123,8 +112,7 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 	if ((object->transparency > 0 || object->reflection > 0) && depth < MAX_RAY_DEPTH) {
 		float facingratio = -dot(ray_dir,nhit);
 		// change the mix value to tweak the effect
-		float fresneleffect = mix(pow(1-facingratio,4),1,0.1);
-		// printf("fresnel :[%f] [%f] \n",fresneleffect, facingratio);
+		float fresneleffect = mix(pow(1-facingratio,3),1,0.1);
 		//compute reflection direction
 		float dot_raydir_nhit = dot(ray_dir,nhit);
 		for(i=0; i<3; i++){
@@ -135,32 +123,31 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 		float * reflection = trace(ray_orig2, refldir, depth+1, obj, obj_size);
 		float * refraction = NULL;
 		// if the sphere is also transparent compute refraction ray
-		// if (object->transparency) {
-		// 	float ior = 1.1, eta = (inside) ? ior : 1/ior; //inside the surface?
-		// 	float cosi = -dot(nhit,ray_dir);
-		// 	float k = 1 - eta*eta*(1 - cosi*cosi);
-		// 	float ksqrt = sqrt(k);
-		// 	for(i=0; i<3; i++){
-		// 		refldir[i] = ray_dir[i]*eta + nhit[i] * (eta * cosi - ksqrt);
-		// 		ray_orig2[i] = phit[i] + nhit[i] * bias;
-		// 	}
-		// 	normalize(refldir);
-		// 	printf("refdir [%f %f %f]\n",refldir[0],refldir[1],refldir[2]);
-		// 	printf("origin [%f %f %f]\n",ray_orig2[0],ray_orig2[1],ray_orig2[2]);
-		// 	refraction = trace(ray_orig2, refldir, depth+1, obj, obj_size);
-		// }
+		if (object->transparency) {
+			float ray_orig3[3];
+			float refldir1[3];
+			float ior = 1.1, eta = (inside) ? ior : 1/ior; //inside the surface?
+			float cosi = -dot(nhit,ray_dir);
+			float k = 1 - eta*eta*(1 - cosi*cosi);
+			float ksqrt = sqrt(k);
+			for(i=0; i<3; i++){
+				refldir1[i] = ray_dir[i]*eta + nhit[i] * (eta * cosi - ksqrt);
+				ray_orig3[i] = phit[i] - nhit[i] * bias;
+			}
+			normalize(refldir1);
+			refraction = trace(ray_orig3, refldir1, depth+1, obj, obj_size);
+		}
 		float refraction_aux[3] = { 0.0, 0.0, 0.0 };
 		if(refraction == NULL) refraction = refraction_aux;
 		for(i=0; i<3; i++)
-			surfacecolor[i] = (reflection[i]*fresneleffect + refraction[i] * (1 - fresneleffect) * object->transparency) * object->surface_color[i];
-		//printf("surface :[%f,%f,%f] nhit [%f,%f,%f]\n reflection [ %f,%f,%f ] refraction [ %f,%f,%f ]\n",surfacecolor[0],surfacecolor[1],surfacecolor[2],nhit[0],nhit[1],nhit[2],reflection[0],reflection[1],reflection[2],refraction[0],refraction[1],refraction[2]);
-		//printf("Trace obj: %s surface: [%f %f %f] refraction: [%f %f %f] fresnel: %f\n",object->label, surfacecolor[0],surfacecolor[1],surfacecolor[2],refraction[0],refraction[1],refraction[2],fresneleffect);
+			surfacecolor[i] = (
+				reflection[i] * fresneleffect + 
+				refraction[i] * (1 - fresneleffect) * object->transparency
+				) * object->surface_color[i];
 	} else {
 		//diffuse object
 		for (i=0; i < obj_size; i++){
-			// printf("\tLUZ %lf\n",obj[i].emission_color[X]);
 			if (obj[i].emission_color[X] > 0) {
-
 				//light
 				float transmission[3] = { 1.0, 1.0, 1.0 };
 				float light_direction[3];
@@ -180,9 +167,8 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 					}
 				}
 				for(int j=0; j<3; j++){
-					surfacecolor[j] += object->surface_color[j] * transmission[j] *( dot(nhit,light_direction)) * obj[i].emission_color[j];
+					surfacecolor[j] += object->surface_color[j] * transmission[j] * (dot(nhit,light_direction)) * obj[i].emission_color[j];
 				}
-				// printf("LIGHT [%f %f %f] [%f %f %f]\n",surfacecolor[0],surfacecolor[1],surfacecolor[2],transmission[0],transmission[1],transmission[2]);
 			}
 		}
 
@@ -193,8 +179,8 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 }
 
 void render(Object *obj, int obj_size){
-	int width = 3840, height = 2160;
-	// int width = 640, height = 480;
+	//int width = 3840, height = 2160;
+	int width = 640, height = 480;
 	float ***image = malloc(width*sizeof(float**));
 	float inv_width = 1 / (0.0+width), inv_height = 1 / (0.0+height);
 	float fov = 30, aspectratio = width / (0.0+height);
@@ -215,17 +201,14 @@ void render(Object *obj, int obj_size){
 			yy = (1 - 2 * ((j + 0.5) * inv_height)) * angle;
 			raydir[0] = xx; raydir[1] = yy; raydir[2] = -1;
 			normalize(raydir);
-			// printf("POSITION [%d, %d]\n",i,j);
 			pixel = trace(rayorig, raydir, 0, obj, obj_size);
-			//printf("TRACE: %d %d; (%f %f %f)\n",j,i,pixel[0],pixel[1],pixel[2]);
 			for(k=0; k<3; k++)
 				image[i][j][k]=pixel[k];
-			// if(i > 311 && j > 57) exit(0);
 		}
 	}
 
 	//save result to a PPM image
-	FILE *fp = fopen("first.ppm", "wb"); /* b - binary mode */
+	FILE *fp = fopen("first2.ppm", "wb"); /* b - binary mode */
 	(void) fprintf(fp, "P6\n%d %d\n255\n", width, height);
 	for (j = 0; j < height; j++) {
 		for (i = 0; i < width; i++) {
@@ -259,9 +242,8 @@ void createObject(char *label, Object *obj,float *position, float radius, float 
 	obj->reflection = reflectivity;
 }
 
-
 int main(){
-	Object *objects = malloc(6*sizeof(Object));
+	Object *objects = malloc(7*sizeof(Object));
 	//circle_center, radius, surface_color,reflectivity, transparency, emission_color
 	float emission_color[3] = {0.0, 0.0, 0.0},ligth_ecolor[3] = {3.0 , 3.0, 3.0};
 	float position1[3] = {0.0, -10004, -20}, surfacecolor1[3] = {0.20, 0.20, 0.20};
@@ -279,10 +261,13 @@ int main(){
 	char label5[] = "black";
 	float position5[3] = {-5.5, 0, -15}, surfacecolor5[3] = {0.90, 0.90, 0.90};
 	createObject(label5,&objects[4],position5, 3, surfacecolor5, 1, 0.0, emission_color); //black
+	char label7[] = "green";
+	float position7[3] = {-4.5, 2.6, -25}, surfacecolor7[3] = {0.20, 1.00, 0.20};
+	createObject(label7,&objects[6],position7, 3, surfacecolor7, 1, 0.0, emission_color); //green
 	// light
 	char label6[] = "light";
 	float position6[3] = {0.0, 20, -30}, surfacecolor6[3] = {0.00, 0.00, 0.00};
-	createObject(label6,&objects[5],position6, 3, surfacecolor6, 0, 0, ligth_ecolor);
-	render(objects, 6);
+	createObject(label6,&objects[5],position6, 5, surfacecolor6, 0, 0, ligth_ecolor);
+	render(objects, 7);
 	return 0;
 }
