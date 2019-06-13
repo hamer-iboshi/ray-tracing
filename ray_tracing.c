@@ -64,11 +64,10 @@ float mix(float a, float b, float mx){
 If the ray intersects an object, compute the intersection point, the normal at the intersection point, and shade this point using this information.
 Shading depends on the surface property (is it transparent, reflective, diffuse). The function returns a color for the ray.
 If the ray intersects an object that is the color of the object at the intersection point, otherwise it returns the background color. */
-float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj_size){
+void trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj_size, float *color){
 	float tnear = INFINITY;
 	int i;
 	Object *object = NULL;
-	static float color[3];
 	// find intersection of this ray with the sphere in the scene
 	for (i=0; i < obj_size; i++) {
 		float t0 = INFINITY, t1 = INFINITY;
@@ -85,7 +84,7 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 	if (!object) {
 		for (i=0; i<3; i++)
 			color[i] = 2;
-			return color;
+			return;
 	}
 	float surfacecolor[3] = { 0.0, 0.0, 0.0 };
 	float phit[3], nhit[3];
@@ -117,8 +116,9 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 			ray_orig2[i] = phit[i] + nhit[i] * bias;
 		}
 		normalize(refldir);
-		float * reflection = trace(ray_orig2, refldir, depth+1, obj, obj_size);
-		float * refraction = NULL;
+		float reflection[3]; 
+		trace(ray_orig2, refldir, depth+1, obj, obj_size, reflection);
+		float refraction[3];
 		// if the sphere is also transparent compute refraction ray
 		if (object->transparency) {
 			float ray_orig3[3];
@@ -132,10 +132,14 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 				ray_orig3[i] = phit[i] - nhit[i] * bias;
 			}
 			normalize(refldir1);
-			refraction = trace(ray_orig3, refldir1, depth+1, obj, obj_size);
+			trace(ray_orig3, refldir1, depth+1, obj, obj_size, refraction);
 		}
 		float refraction_aux[3] = { 0.0, 0.0, 0.0 };
-		if(refraction == NULL) refraction = refraction_aux;
+		if(refraction == NULL) {
+			refraction[0] = refraction_aux[0];
+			refraction[1] = refraction_aux[1];
+			refraction[2] = refraction_aux[2];
+		} 
 		for(i=0; i<3; i++)
 			surfacecolor[i] = (
 				reflection[i] * fresneleffect + 
@@ -172,12 +176,12 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 	}
 	for(i=0; i<3; i++)
 		color[i] = surfacecolor[i] + object->emission_color[i];
-	return color;
+	return;
 }
 
 void render(Object *obj, int obj_size){
-	int width = 3840, height = 2160;
-	//int width = 640, height = 480;
+	//int width = 3840, height = 2160;
+	int width = 640, height = 480;
 	float ***image = malloc(width*sizeof(float**));
 	float inv_width = 1 / (0.0+width), inv_height = 1 / (0.0+height);
 	float fov = 30, aspectratio = width / (0.0+height);
@@ -191,14 +195,14 @@ void render(Object *obj, int obj_size){
 	}
 	//trace rays
 	float xx , yy;
-	float raydir[3], *pixel, rayorig[3] = { 0, 0, 0 }; //cam origin
+	float raydir[3], pixel[3], rayorig[3] = { 0, 0, 0 }; //cam origin
 	for (j=0; j<height; j++) {
 		for (i=0; i<width; i++) {
 			xx = (2 * ((i + 0.5) * inv_width) - 1) * angle * aspectratio;
 			yy = (1 - 2 * ((j + 0.5) * inv_height)) * angle;
 			raydir[0] = xx; raydir[1] = yy; raydir[2] = -1;
 			normalize(raydir);
-			pixel = trace(rayorig, raydir, 0, obj, obj_size);
+			trace(rayorig, raydir, 0, obj, obj_size, pixel);
 			for(k=0; k<3; k++)
 				image[i][j][k]=pixel[k];
 		}
