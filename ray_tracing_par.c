@@ -65,11 +65,10 @@ float mix(float a, float b, float mx){
 If the ray intersects an object, compute the intersection point, the normal at the intersection point, and shade this point using this information.
 Shading depends on the surface property (is it transparent, reflective, diffuse). The function returns a color for the ray.
 If the ray intersects an object that is the color of the object at the intersection point, otherwise it returns the background color. */
-float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj_size){
+void trace(float *color, float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj_size){
 	float tnear = INFINITY;
 	int i;
 	Object *object = NULL;
-	static float color[3];
 	// find intersection of this ray with the sphere in the scene
 	for (i=0; i < obj_size; i++) {
 		float t0 = INFINITY, t1 = INFINITY;
@@ -86,99 +85,97 @@ float* trace(float ray_orig[3], float ray_dir[3], int depth, Object *obj,int obj
 	if (!object) {
 		for (i=0; i<3; i++)
 			color[i] = 2;
-			return color;
-	}
-	float surfacecolor[3] = { 0.0, 0.0, 0.0 };
-	float phit[3], nhit[3];
-	for (i=0; i<3; i++)
-		phit[i] = ray_orig[i] + ray_dir[i] * tnear;
-	subtractXYZ(nhit,phit,object->center);
-	normalize(nhit); //normalize normal direction
-	// If the normal and the view direction are not opposite to each other reverse the normal direction.
-	//That also means we are inside the sphere so set the inside bool to true. Finally reverse the sign of IdotN which we want positive.
-	float bias = 1e-4; //add some vias to the poin to be traced
-	bool inside = false;
-	if (dot(ray_dir,nhit) > 0) {
-		for (i=0; i<3; i++){
-			nhit[i] = -nhit[i];
-		}
-		inside = true;
-	}
-	float ray_orig2[3];
-	float refldir[3];
-
-	if ((object->transparency > 0 || object->reflection > 0) && depth < MAX_RAY_DEPTH) {
-		float facingratio = -dot(ray_dir,nhit);
-		// change the mix value to tweak the effect
-		float fresneleffect = mix(pow(1-facingratio,3),1,0.1);
-		//compute reflection direction
-		float dot_raydir_nhit = dot(ray_dir,nhit);
-		for(i=0; i<3; i++){
-			refldir[i]=ray_dir[i] - nhit[i]*2*dot_raydir_nhit;
-			ray_orig2[i] = phit[i] + nhit[i] * bias;
-		}
-		normalize(refldir);
-		float * reflection = trace(ray_orig2, refldir, depth+1, obj, obj_size);
-		float * refraction = NULL;
-		// if the sphere is also transparent compute refraction ray
-		if (object->transparency) {
-			float ray_orig3[3];
-			float refldir1[3];
-			float ior = 1.1, eta = (inside) ? ior : 1/ior; //inside the surface?
-			float cosi = -dot(nhit,ray_dir);
-			float k = 1 - eta*eta*(1 - cosi*cosi);
-			float ksqrt = sqrt(k);
-			for(i=0; i<3; i++){
-				refldir1[i] = ray_dir[i]*eta + nhit[i] * (eta * cosi - ksqrt);
-				ray_orig3[i] = phit[i] - nhit[i] * bias;
-			}
-			normalize(refldir1);
-			refraction = trace(ray_orig3, refldir1, depth+1, obj, obj_size);
-		}
-		float refraction_aux[3] = { 0.0, 0.0, 0.0 };
-		if(refraction == NULL) refraction = refraction_aux;
-		for(i=0; i<3; i++)
-			surfacecolor[i] = (
-				reflection[i] * fresneleffect + 
-				refraction[i] * (1 - fresneleffect) * object->transparency
-				) * object->surface_color[i];
 	} else {
-		//diffuse object
-		for (i=0; i < obj_size; i++){
-			if (obj[i].emission_color[X] > 0) {
-				//light
-				float transmission[3] = { 1.0, 1.0, 1.0 };
-				float light_direction[3];
-				for(int j=0; j<3; j++)
-					light_direction[j] = obj[i].center[j] - phit[j];
-				normalize(light_direction);
-				for(int j=0; j < obj_size; j++){
-					if( i != j){
-						float t0, t1;
-						for(int k=0; k<3; k++)
-							ray_orig2[k] = phit[k] + nhit[k] * bias;
-						if(intersect(&obj[j],ray_orig2,light_direction, &t0, &t1)){
+		float surfacecolor[3] = { 0.0, 0.0, 0.0 };
+		float phit[3], nhit[3];
+		for (i=0; i<3; i++)
+			phit[i] = ray_orig[i] + ray_dir[i] * tnear;
+		subtractXYZ(nhit,phit,object->center);
+		normalize(nhit); //normalize normal direction
+		// If the normal and the view direction are not opposite to each other reverse the normal direction.
+		//That also means we are inside the sphere so set the inside bool to true. Finally reverse the sign of IdotN which we want positive.
+		float bias = 1e-4; //add some vias to the poin to be traced
+		bool inside = false;
+		if (dot(ray_dir,nhit) > 0) {
+			for (i=0; i<3; i++){
+				nhit[i] = -nhit[i];
+			}
+			inside = true;
+		}
+		float ray_orig2[3];
+		float refldir[3];
+
+		if ((object->transparency > 0 || object->reflection > 0) && depth < MAX_RAY_DEPTH) {
+			float facingratio = -dot(ray_dir,nhit);
+			// change the mix value to tweak the effect
+			float fresneleffect = mix(pow(1-facingratio,3),1,0.1);
+			//compute reflection direction
+			float dot_raydir_nhit = dot(ray_dir,nhit);
+			for(i=0; i<3; i++){
+				refldir[i]=ray_dir[i] - nhit[i]*2*dot_raydir_nhit;
+				ray_orig2[i] = phit[i] + nhit[i] * bias;
+			}
+			normalize(refldir);
+			float reflection[3];
+			trace(reflection, ray_orig2, refldir, depth+1, obj, obj_size);
+			float refraction[3] = { 0.0, 0.0, 0.0 };
+			// if the sphere is also transparent compute refraction ray
+			if (object->transparency) {
+				float ray_orig3[3];
+				float refldir1[3];
+				float ior = 1.1, eta = (inside) ? ior : 1/ior; //inside the surface?
+				float cosi = -dot(nhit,ray_dir);
+				float k = 1 - eta*eta*(1 - cosi*cosi);
+				float ksqrt = sqrt(k);
+				for(i=0; i<3; i++){
+					refldir1[i] = ray_dir[i]*eta + nhit[i] * (eta * cosi - ksqrt);
+					ray_orig3[i] = phit[i] - nhit[i] * bias;
+				}
+				normalize(refldir1);
+				trace( refraction,ray_orig3, refldir1, depth+1, obj, obj_size);
+			}
+			for(i=0; i<3; i++)
+				surfacecolor[i] = (
+					reflection[i] * fresneleffect + 
+					refraction[i] * (1 - fresneleffect) * object->transparency
+					) * object->surface_color[i];
+		} else {
+			//diffuse object
+			for (i=0; i < obj_size; i++){
+				if (obj[i].emission_color[X] > 0) {
+					//light
+					float transmission[3] = { 1.0, 1.0, 1.0 };
+					float light_direction[3];
+					for(int j=0; j<3; j++)
+						light_direction[j] = obj[i].center[j] - phit[j];
+					normalize(light_direction);
+					for(int j=0; j < obj_size; j++){
+						if( i != j){
+							float t0, t1;
 							for(int k=0; k<3; k++)
-								transmission[k] = 0;
-							break;
+								ray_orig2[k] = phit[k] + nhit[k] * bias;
+							if(intersect(&obj[j],ray_orig2,light_direction, &t0, &t1)){
+								for(int k=0; k<3; k++)
+									transmission[k] = 0;
+								break;
+							}
 						}
 					}
-				}
-				for(int j=0; j<3; j++){
-					surfacecolor[j] += object->surface_color[j] * transmission[j] * (dot(nhit,light_direction)) * obj[i].emission_color[j];
+					for(int j=0; j<3; j++){
+						surfacecolor[j] += object->surface_color[j] * transmission[j] * (dot(nhit,light_direction)) * obj[i].emission_color[j];
+					}
 				}
 			}
-		}
 
+		}
+		for(i=0; i<3; i++)
+			color[i] = surfacecolor[i] + object->emission_color[i];
 	}
-	for(i=0; i<3; i++)
-		color[i] = surfacecolor[i] + object->emission_color[i];
-	return color;
 }
 
 void render(Object *obj, int obj_size){
-	//int width = 3840, height = 2160;
-	int width = 640, height = 480;
+	int width = 3840, height = 2160;
+	// int width = 640, height = 480;
 	float ***image = malloc(width*sizeof(float**));
 	float inv_width = 1 / (0.0+width), inv_height = 1 / (0.0+height);
 	float fov = 30, aspectratio = width / (0.0+height);
@@ -193,18 +190,17 @@ void render(Object *obj, int obj_size){
 	//trace rays
 	
 	float rayorig[3] = { 0, 0, 0 }; //cam origin
-	#pragma omp parallel for collapse(2) num_threads(2) schedule(auto) shared(rayorig, height, width)
+	#pragma omp parallel for collapse(2) num_threads(4) schedule(auto)
 	for (int j=0; j<height; j++) {
 		for (int i=0; i<width; i++) {
-			int k;
 			float xx , yy;
-			float raydir[3], *pixel;
+			float raydir[3], pixel[3];
 			xx = (2 * ((i + 0.5) * inv_width) - 1) * angle * aspectratio;
 			yy = (1 - 2 * ((j + 0.5) * inv_height)) * angle;
 			raydir[0] = xx; raydir[1] = yy; raydir[2] = -1;
 			normalize(raydir);
-			pixel = trace(rayorig, raydir, 0, obj, obj_size);
-			for(k=0; k<3; k++)
+			trace(pixel, rayorig, raydir, 0, obj, obj_size);
+			for(int k=0; k<3; k++)
 				image[i][j][k]=pixel[k];
 		}
 	}
